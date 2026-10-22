@@ -6,7 +6,21 @@ Designed specifically for **FRITZ!OS 8.25** (and compatible with FRITZ!OS 7.50+)
 
 ![Widget Preview](https://img.shields.io/badge/Docker-Alpine%20%3C%2080MB-blue?logo=docker)
 ![FRITZ!OS](https://img.shields.io/badge/FRITZ!OS-8.25%20Verified-red)
+[![Live Demo](https://img.shields.io/badge/Demo-Live%20Preview-brightgreen?logo=github)](https://vladyslav-keidaliuk.github.io/fritzbox-homarr-widget/?demo=1)
 ![License](https://img.shields.io/badge/License-MIT-green)
+
+---
+
+## 🌐 Live Interactive Demo
+
+Experience the widget live in your browser with zero installation:
+
+👉 **[Open Live Demo on GitHub Pages](https://vladyslav-keidaliuk.github.io/fritzbox-homarr-widget/?demo=1)**
+
+- ⚡ Live simulated bandwidth fluctuations and 60-second canvas sparkline.
+- 🔄 Click Download / Upload cards to toggle between **`Mbps`** and **`MB/s`**.
+- 📶 Click the **`8 active`** badge to open the client inspection modal with search filtering.
+- 👁️ Click the WAN IP pill to toggle privacy masking.
 
 ---
 
@@ -146,15 +160,59 @@ curl http://localhost:5050/api/metrics
 
 ## 4. Adding to Homarr Dashboard
 
-1. Open your **Homarr** dashboard.
-2. Enter **Edit Mode** (pencil icon in the top right).
-3. Click **Add Tile** and choose **iFrame / Embed**.
-4. Configure the widget tile:
-   - **URL**: `http://<YOUR_DOCKER_HOST_IP>:5050` (e.g. `http://192.168.1.100:5050`)
-   - **Title**: *FRITZ!Box* (or leave blank for clean borderless look)
-   - **Width**: `2` or `3` grid units
-   - **Height**: `1` or `2` grid units
-5. Save changes. The widget will seamlessly blend into Homarr's dark theme with zero scrollbars.
+The widget is specifically designed to embed into Homarr via an **iFrame tile** with zero scrollbars, transparent backgrounds, and a native dark slate theme matching Homarr's UI.
+
+### Step-by-Step Setup
+
+1. **Open Homarr** in your browser and enter **Edit Mode** (click the pencil ✏️ icon in the top navigation).
+2. Click **+ Add Item** (or **+ Add Tile**).
+3. Search for and select the **`iFrame`** widget (labeled **`Embed`** or **`Custom Web Page`** in some versions).
+4. Configure the tile properties:
+   - **URL / Source**: 
+     - *Local network setup:* `http://<YOUR_SERVER_IP>:5050` (e.g. `http://192.168.178.71:5050`)
+     - *Reverse proxy / HTTPS setup:* `https://<YOUR_DOMAIN>/fritz` or relative `/fritz` (see below)
+   - **Title**: `FRITZ!Box` *(or leave blank for a clean borderless card)*
+   - **Width**: `3` grid units
+   - **Height**: `2` grid units *(recommended to comfortably display the sparkline chart and active clients badge)*
+5. Click **Save** on the tile, then click the **Save / Checkmark** icon in Homarr's top bar to persist your dashboard layout.
+
+---
+
+### Important: HTTPS & Mixed Content Handling
+
+If your Homarr dashboard is running over **HTTPS** (e.g. at `https://dashboard.yourdomain.com`), modern web browsers strictly block insecure `http://` iFrames due to browser **Mixed Content** security policies.
+
+To embed the widget on an HTTPS dashboard:
+
+#### Method A: Sub-Path Routing on the Same Domain (Recommended)
+Route `/fritz` on your existing dashboard domain to the widget container on port `5050`:
+- **Coolify**: Set the widget's domain to `https://dashboard.yourdomain.com/fritz`
+- **Traefik**: Add a router rule `PathPrefix(`/fritz`)`
+- **Caddy**: `handle_path /fritz* { reverse_proxy fritzbox-widget:5050 }`
+- **Nginx**: `location /fritz/ { proxy_pass http://fritzbox-widget:5050/; }`
+
+Then in Homarr's iFrame settings, simply set the Embed URL to:
+```
+/fritz
+```
+*(or `https://dashboard.yourdomain.com/fritz`)*
+
+Because both Homarr and the widget share the exact same HTTPS domain, it loads with **zero SSL warnings, zero Cloudflare DNS changes, and zero browser blocks**.
+
+#### Method B: Browser Insecure Content Override (Quick Local Testing)
+If accessing your HTTPS Homarr without setting up a reverse proxy path:
+1. In Chrome, click the **tune / site settings icon (🎚️)** next to your dashboard URL.
+2. Open **Site settings** → scroll to **Insecure content** → change to **Allow**.
+3. Reload Homarr. The local `http://` iFrame will render immediately.
+
+---
+
+### Interactive Dashboard Features
+
+Once added to your dashboard, the widget provides several interactive controls:
+- **Mbps / MB/s Toggle**: Click either the Download or Upload card to switch between Megabits/s and Megabytes/s. Your preferred unit is automatically remembered across reloads.
+- **Active Clients Inspection**: Click the **`X active`** badge in the header to open an embedded slide-over modal displaying all currently connected devices with hostnames, IP addresses, Wi-Fi (📶) vs LAN (🔌) indicators, and real-time search filtering. Press <kbd>Esc</kbd> or click <kbd>✕</kbd> to close.
+- **Public IP Privacy Mask**: Click the public IP pill (👁) in the bottom bar to toggle masking on/off (`•••.•••.•••.•••`), keeping your real IP safe from accidental exposure in screenshots.
 
 ---
 

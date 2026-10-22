@@ -937,6 +937,92 @@
     const historyDown = new Array(MAX_HISTORY).fill(0);
     const historyUp = new Array(MAX_HISTORY).fill(0);
 
+    // GitHub Pages / Static Demo detection
+    const isStaticDemo = window.location.hostname.endsWith("github.io") || 
+                         new URLSearchParams(window.location.search).has("demo") ||
+                         new URLSearchParams(window.location.search).has("mock");
+
+    const demoStartTime = Date.now() - 3600 * 1000 * 21;
+    let demoTotalRecv = 4_100_000_000;
+    let demoTotalSent = 450_000_000;
+
+    function generateClientMockData() {
+      const now = Date.now() / 1000;
+      const uptimeSec = Math.floor((Date.now() - demoStartTime) / 1000);
+      const days = Math.floor(uptimeSec / 86400);
+      const hours = Math.floor((uptimeSec % 86400) / 3600);
+      const minutes = Math.floor((uptimeSec % 3600) / 60);
+
+      const t = now * 0.4;
+      const downMbps = Math.max(3.5, +(42.0 + 32.0 * Math.sin(t) + (Math.random() * 6 - 3)).toFixed(2));
+      const upMbps = Math.max(1.2, +(14.0 + 10.0 * Math.cos(t * 0.7) + (Math.random() * 2 - 1)).toFixed(2));
+
+      demoTotalRecv += Math.floor((downMbps * 1000000) / 8 * 2);
+      demoTotalSent += Math.floor((upMbps * 1000000) / 8 * 2);
+
+      const formatBytes = (bytes) => {
+        let val = bytes;
+        for (const unit of ["B", "KB", "MB", "GB", "TB"]) {
+          if (val < 1024.0) return `${val.toFixed(2)} ${unit}`;
+          val /= 1024.0;
+        }
+        return `${val.toFixed(2)} TB`;
+      };
+
+      return {
+        status: "online",
+        mock_mode: true,
+        router: {
+          ip: "192.168.178.1",
+          model: "FRITZ!Box 7530 AX (Live Demo)",
+          software_version: "256.08.25",
+          firmware: "FRITZ!OS 8.25",
+          access_type: "VDSL2",
+          external_ip: "93.180.42.15",
+          is_connected: true,
+          dns_servers: "1.1.1.1, 1.0.0.1",
+          wifi_bands: "2.4G + 5G",
+          connected_devices: 8,
+          total_devices: 94,
+          active_devices_list: [
+            { name: "MacBook-Pro-M5", ip: "192.168.178.20", type: "wifi" },
+            { name: "iPhone-15-Pro", ip: "192.168.178.25", type: "wifi" },
+            { name: "iPad-Air", ip: "192.168.178.28", type: "wifi" },
+            { name: "XBOX-Series-X", ip: "192.168.178.30", type: "lan" },
+            { name: "PS5-Console", ip: "192.168.178.35", type: "lan" },
+            { name: "HomePod-Mini", ip: "192.168.178.42", type: "wifi" },
+            { name: "Philips-Hue-Bridge", ip: "192.168.178.50", type: "lan" },
+            { name: "Apple-Watch", ip: "192.168.178.55", type: "wifi" },
+          ],
+        },
+        traffic: {
+          download: {
+            mbps: downMbps,
+            mbyte_s: +(downMbps / 8 * (1000000 / (1024 * 1024))).toFixed(2),
+            max_mbps: 112.1,
+            utilization_pct: +Math.min(100, (downMbps / 112.1) * 100).toFixed(1),
+            total_bytes: demoTotalRecv,
+            total_formatted: formatBytes(demoTotalRecv),
+          },
+          upload: {
+            mbps: upMbps,
+            mbyte_s: +(upMbps / 8 * (1000000 / (1024 * 1024))).toFixed(2),
+            max_mbps: 31.3,
+            utilization_pct: +Math.min(100, (upMbps / 31.3) * 100).toFixed(1),
+            total_bytes: demoTotalSent,
+            total_formatted: formatBytes(demoTotalSent),
+          },
+        },
+        uptime: {
+          formatted: `${hours}h ${minutes}m`,
+          days,
+          hours,
+          minutes,
+          total_seconds: uptimeSec,
+        },
+      };
+    }
+
     // Unit display state ('mbps' or 'mbytes')
     let currentUnit = localStorage.getItem("preferred_unit") || "mbps";
 
@@ -1335,11 +1421,27 @@
       drawChart();
     }
 
-    // Fetch metrics from backend API
+    // Fetch metrics from backend API (or run live simulated mock on GitHub Pages)
     async function fetchMetrics() {
+      if (isStaticDemo) {
+        statusDot.className = "status-dot pulsing";
+        errorBanner.classList.remove("visible");
+        renderMetrics(generateClientMockData());
+        return;
+      }
+
       try {
         const basePath = window.location.pathname.replace(/\/+$/, "");
         const response = await fetch(`${basePath}/api/metrics`);
+        
+        if (!response.ok) {
+          if (window.location.hostname.endsWith("github.io")) {
+            renderMetrics(generateClientMockData());
+            return;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+
         const data = await response.json();
 
         if (data.status === "error") {
@@ -1356,6 +1458,10 @@
         renderMetrics(data);
 
       } catch (err) {
+        if (window.location.hostname.endsWith("github.io")) {
+          renderMetrics(generateClientMockData());
+          return;
+        }
         statusDot.className = "status-dot error";
         errorBanner.classList.add("visible");
         errorMessage.textContent = "Widget backend offline or restarting...";
