@@ -62,19 +62,23 @@ def set_security_headers(response):
 
 
 @app.route("/")
-def index():
+@app.route("/<string:_prefix>")
+@app.route("/<string:_prefix>/")
+def index(_prefix=None):
   """Renders the dark-mode responsive dashboard frontend."""
   return render_template("index.html")
 
 
 @app.route("/health")
-def health():
+@app.route("/<string:_prefix>/health")
+def health(_prefix=None):
   """Lightweight Docker container health-check endpoint."""
   return jsonify({"status": "healthy"}), 200
 
 
 @app.route("/api/metrics")
-def get_metrics():
+@app.route("/<string:_prefix>/api/metrics")
+def get_metrics(_prefix=None):
   """TR-064 metrics API endpoint queried by the frontend every 2 seconds."""
   global _metrics_cache
 

@@ -1338,7 +1338,8 @@
     // Fetch metrics from backend API
     async function fetchMetrics() {
       try {
-        const response = await fetch("/api/metrics");
+        const basePath = window.location.pathname.replace(/\/+$/, "");
+        const response = await fetch(`${basePath}/api/metrics`);
         const data = await response.json();
 
         if (data.status === "error") {

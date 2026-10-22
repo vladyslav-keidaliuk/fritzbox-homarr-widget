@@ -8,14 +8,11 @@ services:
     restart: unless-stopped
     ports:
       - "5050:5050"
-    env_file:
-      - .env
-    # Alternatively, specify environment variables directly here:
-    # environment:
-    #   - ROUTER_IP=192.168.178.1
-    #   - ROUTER_PORT=49000
-    #   - ROUTER_PROTOCOL=http
-    #   - ROUTER_USERNAME=your_fritzbox_username
-    #   - ROUTER_PASSWORD=your_fritzbox_password
-    #   - PORT=5050
-    #   - MOCK_MODE=false
+    environment:
+      - ROUTER_IP=${ROUTER_IP:-192.168.178.1}
+      - ROUTER_PORT=${ROUTER_PORT:-49000}
+      - ROUTER_PROTOCOL=${ROUTER_PROTOCOL:-http}
+      - ROUTER_USERNAME=${ROUTER_USERNAME:-}
+      - ROUTER_PASSWORD=${ROUTER_PASSWORD:-}
+      - PORT=${PORT:-5050}
+      - MOCK_MODE=${MOCK_MODE:-false}
