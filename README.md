@@ -35,6 +35,10 @@ Experience the widget live in your browser with zero installation:
   <p><em>Real-time traffic throughput, line utilization, active devices counter, and 60-second sparkline activity chart.</em></p>
 </div>
 
+<div align="center">
+  <img src="docs/screenshots/homarr-iframe-widget.png" alt="FRITZ!Box Homarr Widget Dashboard" width="750" />
+  <p><em>Homarr real-time iFrame widget.</em></p>
+</div>
 ---
 
 ## Features
