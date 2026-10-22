@@ -1,0 +1,21 @@
+services:
+  fritzbox-widget:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fritzbox-homarr-widget:latest
+    container_name: fritzbox-homarr-widget
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    env_file:
+      - .env
+    # Alternatively, specify environment variables directly here:
+    # environment:
+    #   - ROUTER_IP=192.168.178.1
+    #   - ROUTER_PORT=49000
+    #   - ROUTER_PROTOCOL=http
+    #   - ROUTER_USERNAME=your_fritzbox_username
+    #   - ROUTER_PASSWORD=your_fritzbox_password
+    #   - PORT=5050
+    #   - MOCK_MODE=false

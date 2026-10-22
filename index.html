@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FRITZ!Box Monitor</title>
+  <style>
+    :root {
+      --bg-base: #0b0f19;
+      --card-bg: rgba(18, 24, 38, 0.95);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover-border: rgba(255, 255, 255, 0.16);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --download-color: #10b981;
+      --download-glow: rgba(16, 185, 129, 0.25);
+      --download-bg: rgba(16, 185, 129, 0.08);
+      --upload-color: #0ea5e9;
+      --upload-glow: rgba(14, 165, 233, 0.25);
+      --upload-bg: rgba(14, 165, 233, 0.08);
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --radius-lg: 12px;
+      --radius-md: 8px;
+      --radius-sm: 6px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden; /* Strict scrollbar prevention for Homarr iFrame */
+      background: var(--bg-base);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-primary);
+      user-select: none;
+    }
+
+    .widget-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      padding: 8px 10px;
+      gap: 5px;
+      position: relative;
+      background: radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.45) 0%, rgba(11, 15, 25, 0.98) 100%);
+    }
+
+    /* Header Bar */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 22px;
+      flex-shrink: 0;
+      gap: 6px;
+    }
+
+    .device-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--download-color);
+      box-shadow: 0 0 8px var(--download-color);
+      flex-shrink: 0;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .status-dot.pulsing {
+      animation: pulse 1.8s infinite;
+    }
+
+    .status-dot.error {
+      background-color: var(--danger-color);
+      box-shadow: 0 0 8px var(--danger-color);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    .device-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .firmware-tag {
+      font-size: 0.62rem;
+      font-weight: 500;
+      padding: 1px 5px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-secondary);
+      border: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+
+    .header-badges {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+
+    .badge svg {
+      width: 11px;
+      height: 11px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    /* Unit Switcher Button */
+    .unit-switcher {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 1px 2px;
+      cursor: pointer;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+    }
+
+    .unit-switcher:hover {
+      border-color: var(--card-hover-border);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .unit-pill {
+      padding: 1px 5px;
+      border-radius: 4px;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .unit-pill.active {
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--text-primary);
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      padding: 7px 9px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+
+    .metric-card:hover {
+      border-color: var(--card-hover-border);
+    }
+
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      opacity: 0.8;
+    }
+
+    .metric-card.download::before {
+      background: linear-gradient(90deg, transparent, var(--download-color), transparent);
+    }
+
+    .metric-card.upload::before {
+      background: linear-gradient(90deg, transparent, var(--upload-color), transparent);
+    }
+
+    .metric-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-card.download .metric-label {
+      color: var(--download-color);
+    }
+
+    .metric-card.upload .metric-label {
+      color: var(--upload-color);
+    }
+
+    .icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+
+    .metric-card.download .icon-wrapper {
+      background: var(--download-bg);
+      color: var(--download-color);
+    }
+
+    .metric-card.upload .icon-wrapper {
+      background: var(--upload-bg);
+      color: var(--upload-color);
+    }
+
+    .metric-value-container {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin: 1px 0 0 0;
+    }
+
+    .metric-number {
+      font-size: clamp(1.15rem, 3.8vw, 1.55rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--text-primary);
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-unit {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .metric-secondary {
+      font-size: 0.62rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    /* Utilization Progress Bar */
+    .util-bar-container {
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 3px 0;
+    }
+
+    .util-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .util-bar.download {
+      background: var(--download-color);
+      box-shadow: 0 0 6px var(--download-glow);
+    }
+
+    .util-bar.upload {
+      background: var(--upload-color);
+      box-shadow: 0 0 6px var(--upload-glow);
+    }
+
+    .metric-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.62rem;
+      color: var(--text-secondary);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      padding-top: 3px;
+      margin-top: 2px;
+    }
+
+    .metric-total-label {
+      color: var(--text-muted);
+    }
+
+    .metric-total-value {
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .line-util-tag {
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* Sub-Info Bar (External IP, DNS, Connection state) */
+    .info-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1px 3px;
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      gap: 6px;
+    }
+
+    .info-left, .info-right {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      overflow: hidden;
+    }
+
+    .ip-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 1px 5px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      transition: all 0.2s ease;
+    }
+
+    .ip-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+
+    .ip-item svg {
+      width: 10px;
+      height: 10px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .eye-icon {
+      font-size: 0.6rem;
+      opacity: 0.7;
+    }
+
+    .info-tag {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      white-space: nowrap;
+    }
+
+    /* Live Canvas Chart Area */
+    .chart-container {
+      width: 100%;
+      height: 34px;
+      flex-shrink: 0;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-md);
+      position: relative;
+      overflow: hidden;
+    }
+
+    canvas#trafficCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Error Notification Banner */
+    .error-banner {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: var(--radius-md);
+      font-size: 0.66rem;
+      color: #fca5a5;
+      flex-shrink: 0;
+    }
+
+    .error-banner.visible {
+      display: flex;
+    }
+
+    .error-banner svg {
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      flex-shrink: 0;
+    }
+
+    /* Clickable badge styling */
+    .badge.clickable {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .badge.clickable:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--card-hover-border);
+      color: var(--text-primary);
+    }
+
+    /* Connected Devices Modal Overlay */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 15, 25, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      padding: 7px 9px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      transform: scale(0.98);
+      border-radius: var(--radius-lg);
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--card-border);
+      flex-shrink: 0;
+      gap: 6px;
+    }
+
+    .modal-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .modal-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .modal-counter {
+      font-size: 0.62rem;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 1px 6px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .modal-close-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-secondary);
+      border-radius: 5px;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.75rem;
+      line-height: 1;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .modal-close-btn:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    /* Search input inside modal */
+    .modal-search-box {
+      margin: 5px 0 5px 0;
+      position: relative;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .modal-search-box svg {
+      position: absolute;
+      left: 7px;
+      width: 11px;
+      height: 11px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .modal-search-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 3px 22px 3px 24px;
+      font-size: 0.68rem;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .modal-search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .modal-search-input:focus {
+      border-color: rgba(14, 165, 233, 0.5);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .clear-search-btn {
+      position: absolute;
+      right: 5px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.7rem;
+      line-height: 1;
+      padding: 2px;
+    }
+
+    .clear-search-btn:hover {
+      color: var(--text-primary);
+    }
+
+    /* Scrollable device list */
+    .modal-device-list {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-right: 2px;
+      min-height: 0;
+    }
+
+    /* Custom slim scrollbar */
+    .modal-device-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .modal-device-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .modal-device-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+    .modal-device-list::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .device-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      gap: 6px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .device-row:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: var(--card-border);
+    }
+
+    .device-info-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .device-type-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .device-type-icon.wifi {
+      background: rgba(14, 165, 233, 0.12);
+      color: #38bdf8;
+    }
+
+    .device-type-icon.lan {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+    }
+
+    .device-type-icon svg {
+      width: 11px;
+      height: 11px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .device-names {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .device-item-name {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+    }
+
+    .device-item-ip {
+      font-size: 0.58rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }
+
+    .device-tag {
+      font-size: 0.58rem;
+      font-weight: 500;
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .device-tag.wifi {
+      background: rgba(14, 165, 233, 0.1);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.2);
+    }
+
+    .device-tag.lan {
+      background: rgba(16, 185, 129, 0.1);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .device-empty-state {
+      padding: 16px 8px;
+      text-align: center;
+      font-size: 0.66rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Ultra-compact screen adjustments (< 185px container height) */
+    @media (max-height: 185px) {
+      .widget-container { padding: 4px 6px; gap: 2px; }
+      .chart-container { display: none; }
+      .info-bar { display: none; }
+      .metric-secondary { display: none; }
+      .util-bar-container { display: none; }
+      .metric-footer { display: none; }
+      .metric-card { padding: 4px 6px; }
+      .metric-number { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="widget-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="device-meta">
+        <div class="status-dot pulsing" id="statusDot" title="Live TR-064 Connection"></div>
+        <div class="device-name" id="deviceName">FRITZ!Box</div>
+        <div class="firmware-tag" id="firmwareTag">OS 8.25</div>
+      </div>
+
+      <div class="header-badges">
+        <!-- Wi-Fi Bands -->
+        <div class="badge" id="wifiBadge" title="Wi-Fi Status" style="display: none;">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+            <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+          </svg>
+          <span id="wifiBands">--</span>
+        </div>
+
+        <!-- Connected Devices Count (clickable to view active devices) -->
+        <div class="badge clickable" id="devicesBadge" title="Click to view actively connected devices" style="display: none;">
+          <svg viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span id="devicesCount">--</span>
+        </div>
+
+        <!-- Uptime -->
+        <div class="badge" title="Router Uptime">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span id="uptimeValue">--</span>
+        </div>
+
+        <!-- Unit Switcher Toggle (Mbps vs MB/s) -->
+        <div class="unit-switcher" id="unitSwitcher" title="Click to switch unit (Mbps / MB/s)">
+          <span class="unit-pill active" id="pillMbps">Mbps</span>
+          <span class="unit-pill" id="pillMBytes">MB/s</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="errorBanner">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span id="errorMessage">Connecting to FRITZ!Box...</span>
+    </div>
+
+    <!-- Real-time Traffic Cards -->
+    <div class="metrics-grid">
+      <!-- Download -->
+      <div class="metric-card download" id="cardDownload" title="Click to toggle units">
+        <div class="metric-header">
+          <div class="metric-label">
+            <span class="icon-wrapper">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <polyline points="19 12 12 19 5 12"></polyline>
+              </svg>
+            </span>
+            Download
+          </div>
+          <span class="line-util-tag" id="downUtilText"></span>
+        </div>
+        
+        <div class="metric-value-container">
+          <span class="metric-number" id="downSpeed">0.00</span>
+          <span class="metric-unit" id="downUnit">Mbps</span>
+        </div>
+
+        <div class="metric-secondary" id="downSecondary">≈ 0.00 MB/s</div>
+
+        <!-- Line Utilization Bar -->
+        <div class="util-bar-container">
+          <div class="util-bar download" id="downUtilBar"></div>
+        </div>
+
+        <div class="metric-footer">
+          <span class="metric-total-label">Total</span>
+          <span class="metric-total-value" id="downTotal">0 B</span>
+        </div>
+      </div>
+
+      <!-- Upload -->
+      <div class="metric-card upload" id="cardUpload" title="Click to toggle units">
+        <div class="metric-header">
+          <div class="metric-label">
+            <span class="icon-wrapper">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+            </span>
+            Upload
+          </div>
+          <span class="line-util-tag" id="upUtilText"></span>
+        </div>
+
+        <div class="metric-value-container">
+          <span class="metric-number" id="upSpeed">0.00</span>
+          <span class="metric-unit" id="upUnit">Mbps</span>
+        </div>
+
+        <div class="metric-secondary" id="upSecondary">≈ 0.00 MB/s</div>
+
+        <!-- Line Utilization Bar -->
+        <div class="util-bar-container">
+          <div class="util-bar upload" id="upUtilBar"></div>
+        </div>
+
+        <div class="metric-footer">
+          <span class="metric-total-label">Total</span>
+          <span class="metric-total-value" id="upTotal">0 B</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-Info Bar (External IP with click-to-reveal, Connection State, DNS) -->
+    <div class="info-bar" id="infoBar">
+      <div class="info-left">
+        <div class="ip-item" id="ipWrapper" title="Click to show/hide public WAN IP">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          <span id="ipDisplay">WAN: •••.•••.•••.•••</span>
+          <span class="eye-icon" id="eyeIcon">👁</span>
+        </div>
+      </div>
+      <div class="info-right">
+        <span class="info-tag" id="statusTag">🟢 Online</span>
+        <span class="info-tag" id="dnsTag" style="display: none;">DNS: Auto</span>
+      </div>
+    </div>
+
+    <!-- Mini Real-time Activity Sparkline -->
+    <div class="chart-container">
+      <canvas id="trafficCanvas"></canvas>
+    </div>
+
+    <!-- Connected Devices Modal Overlay -->
+    <div class="modal-overlay" id="devicesModal">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-title">Active Devices</span>
+          <span class="modal-counter" id="modalDeviceCounter">0 online</span>
+        </div>
+        <button class="modal-close-btn" id="closeDevicesModal" title="Close (Esc)">✕</button>
+      </div>
+
+      <div class="modal-search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="modal-search-input" id="deviceSearchInput" placeholder="Filter by name or IP..." />
+        <button class="clear-search-btn" id="clearSearchBtn" style="display:none;" title="Clear">✕</button>
+      </div>
+
+      <div class="modal-device-list" id="modalDeviceList">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State management
+    const MAX_HISTORY = 30; // Store last 30 data points (~60 seconds of history)
+    const historyDown = new Array(MAX_HISTORY).fill(0);
+    const historyUp = new Array(MAX_HISTORY).fill(0);
+
+    // Unit display state ('mbps' or 'mbytes')
+    let currentUnit = localStorage.getItem("preferred_unit") || "mbps";
+
+    // External IP Privacy Masking state
+    let rawExternalIP = "";
+    let isIPMasked = localStorage.getItem("mask_ip") !== "false";
+
+    let lastMetrics = null;
+
+    const canvas = document.getElementById("trafficCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Elements
+    const statusDot = document.getElementById("statusDot");
+    const deviceName = document.getElementById("deviceName");
+    const firmwareTag = document.getElementById("firmwareTag");
+    const uptimeValue = document.getElementById("uptimeValue");
+    const wifiBadge = document.getElementById("wifiBadge");
+    const wifiBands = document.getElementById("wifiBands");
+    const devicesBadge = document.getElementById("devicesBadge");
+    const devicesCount = document.getElementById("devicesCount");
+    const unitSwitcher = document.getElementById("unitSwitcher");
+    const pillMbps = document.getElementById("pillMbps");
+    const pillMBytes = document.getElementById("pillMBytes");
+
+    const downSpeed = document.getElementById("downSpeed");
+    const downUnit = document.getElementById("downUnit");
+    const downSecondary = document.getElementById("downSecondary");
+    const downUtilBar = document.getElementById("downUtilBar");
+    const downUtilText = document.getElementById("downUtilText");
+    const downTotal = document.getElementById("downTotal");
+
+    const upSpeed = document.getElementById("upSpeed");
+    const upUnit = document.getElementById("upUnit");
+    const upSecondary = document.getElementById("upSecondary");
+    const upUtilBar = document.getElementById("upUtilBar");
+    const upUtilText = document.getElementById("upUtilText");
+    const upTotal = document.getElementById("upTotal");
+
+    const ipWrapper = document.getElementById("ipWrapper");
+    const ipDisplay = document.getElementById("ipDisplay");
+    const eyeIcon = document.getElementById("eyeIcon");
+    const statusTag = document.getElementById("statusTag");
+    const dnsTag = document.getElementById("dnsTag");
+
+    const errorBanner = document.getElementById("errorBanner");
+    const errorMessage = document.getElementById("errorMessage");
+
+    // Modal Elements
+    const devicesModal = document.getElementById("devicesModal");
+    const closeDevicesModalBtn = document.getElementById("closeDevicesModal");
+    const modalDeviceCounter = document.getElementById("modalDeviceCounter");
+    const modalDeviceList = document.getElementById("modalDeviceList");
+    const deviceSearchInput = document.getElementById("deviceSearchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+
+    let currentActiveDevices = [];
+    let isDevicesModalOpen = false;
+
+    // Toggle units between Mbps and MB/s
+    function toggleUnit() {
+      currentUnit = currentUnit === "mbps" ? "mbytes" : "mbps";
+      localStorage.setItem("preferred_unit", currentUnit);
+      updateUnitUI();
+      if (lastMetrics) renderMetrics(lastMetrics);
+    }
+
+    function updateUnitUI() {
+      if (currentUnit === "mbps") {
+        pillMbps.classList.add("active");
+        pillMBytes.classList.remove("active");
+      } else {
+        pillMBytes.classList.add("active");
+        pillMbps.classList.remove("active");
+      }
+    }
+
+    unitSwitcher.addEventListener("click", toggleUnit);
+    document.getElementById("cardDownload").addEventListener("click", toggleUnit);
+    document.getElementById("cardUpload").addEventListener("click", toggleUnit);
+    updateUnitUI();
+
+    // Toggle IP Privacy Masking
+    function toggleIPMask() {
+      isIPMasked = !isIPMasked;
+      localStorage.setItem("mask_ip", isIPMasked.toString());
+      renderIP();
+    }
+    ipWrapper.addEventListener("click", toggleIPMask);
+
+    function renderIP() {
+      if (!rawExternalIP) {
+        ipDisplay.textContent = "WAN: Offline";
+        eyeIcon.style.display = "none";
+        return;
+      }
+      eyeIcon.style.display = "inline";
+      if (isIPMasked) {
+        const parts = rawExternalIP.split(".");
+        if (parts.length === 4) {
+          ipDisplay.textContent = `WAN: ${parts[0]}.${parts[1]}.•••.•••`;
+        } else {
+          ipDisplay.textContent = "WAN: •••.•••.•••.•••";
+        }
+        eyeIcon.textContent = "👁";
+      } else {
+        ipDisplay.textContent = `WAN: ${rawExternalIP}`;
+        eyeIcon.textContent = "🔒";
+      }
+    }
+
+    // Modal open / close / filter logic
+    function openDevicesModal() {
+      isDevicesModalOpen = true;
+      devicesModal.classList.add("open");
+      renderModalDeviceList();
+      setTimeout(() => deviceSearchInput.focus(), 50);
+    }
+
+    function closeDevicesModal() {
+      isDevicesModalOpen = false;
+      devicesModal.classList.remove("open");
+      deviceSearchInput.value = "";
+      clearSearchBtn.style.display = "none";
+    }
+
+    devicesBadge.addEventListener("click", () => {
+      if (isDevicesModalOpen) closeDevicesModal();
+      else openDevicesModal();
+    });
+
+    closeDevicesModalBtn.addEventListener("click", closeDevicesModal);
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && isDevicesModalOpen) {
+        closeDevicesModal();
+      }
+    });
+
+    deviceSearchInput.addEventListener("input", (e) => {
+      const q = e.target.value.trim();
+      clearSearchBtn.style.display = q ? "block" : "none";
+      renderModalDeviceList();
+    });
+
+    clearSearchBtn.addEventListener("click", () => {
+      deviceSearchInput.value = "";
+      clearSearchBtn.style.display = "none";
+      deviceSearchInput.focus();
+      renderModalDeviceList();
+    });
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function renderModalDeviceList() {
+      const query = (deviceSearchInput.value || "").trim().toLowerCase();
+      const filtered = currentActiveDevices.filter(dev => {
+        if (!query) return true;
+        const name = (dev.name || "").toLowerCase();
+        const ip = (dev.ip || "").toLowerCase();
+        const type = (dev.type || "").toLowerCase();
+        return name.includes(query) || ip.includes(query) || type.includes(query);
+      });
+
+      modalDeviceCounter.textContent = `${currentActiveDevices.length} online`;
+
+      if (currentActiveDevices.length === 0) {
+        modalDeviceList.innerHTML = `
+          <div class="device-empty-state">
+            <span>No actively connected devices detected.</span>
+          </div>`;
+        return;
+      }
+
+      if (filtered.length === 0) {
+        modalDeviceList.innerHTML = `
+          <div class="device-empty-state">
+            <span>No devices matching "<strong>${escapeHtml(query)}</strong>"</span>
+          </div>`;
+        return;
+      }
+
+      modalDeviceList.innerHTML = filtered.map(dev => {
+        const isWifi = dev.type === "wifi";
+        const iconSvg = isWifi
+          ? `<svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>`
+          : `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><line x1="9" y1="20" x2="9" y2="17"></line><line x1="15" y1="20" x2="15" y2="17"></line><line x1="12" y1="4" x2="12" y2="2"></line></svg>`;
+
+        return `
+          <div class="device-row">
+            <div class="device-info-left">
+              <div class="device-type-icon ${isWifi ? 'wifi' : 'lan'}" title="${isWifi ? 'Wi-Fi' : 'Ethernet LAN'}">
+                ${iconSvg}
+              </div>
+              <div class="device-names">
+                <span class="device-item-name" title="${escapeHtml(dev.name)}">${escapeHtml(dev.name)}</span>
+                <span class="device-item-ip">${escapeHtml(dev.ip || '--')}</span>
+              </div>
+            </div>
+            <div class="device-tag ${isWifi ? 'wifi' : 'lan'}">
+              ${isWifi ? 'Wi-Fi' : 'LAN'}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Canvas resize handler (high-DPI crisp rendering)
+    function resizeCanvas() {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.resetTransform?.();
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener("resize", () => {
+      resizeCanvas();
+      drawChart();
+    });
+
+    // Draw smooth multi-line sparkline
+    function drawChart() {
+      const rect = canvas.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+      if (width === 0 || height === 0) return;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const maxVal = Math.max(1, ...historyDown, ...historyUp) * 1.15;
+      const step = width / (MAX_HISTORY - 1);
+
+      function renderSeries(data, strokeColor, fillColor) {
+        if (data.length === 0) return;
+
+        ctx.beginPath();
+        data.forEach((val, i) => {
+          const x = i * step;
+          const y = height - (val / maxVal) * (height - 6) - 3;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+
+        // Fill area
+        ctx.save();
+        const fillPath = new Path2D();
+        data.forEach((val, i) => {
+          const x = i * step;
+          const y = height - (val / maxVal) * (height - 6) - 3;
+          if (i === 0) fillPath.moveTo(x, y);
+          else fillPath.lineTo(x, y);
+        });
+        fillPath.lineTo(width, height);
+        fillPath.lineTo(0, height);
+        fillPath.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill(fillPath);
+        ctx.restore();
+
+        // Stroke line
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.75;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+
+      renderSeries(historyUp, "#0ea5e9", "rgba(14, 165, 233, 0.12)");
+      renderSeries(historyDown, "#10b981", "rgba(16, 185, 129, 0.18)");
+    }
+
+    // Render metrics to UI
+    function renderMetrics(data) {
+      lastMetrics = data;
+
+      // Device & firmware details
+      if (data.router) {
+        deviceName.textContent = data.router.model || "FRITZ!Box";
+        firmwareTag.textContent = data.router.firmware || "OS 8.25";
+
+        // Connected devices badge
+        if (data.router.connected_devices !== undefined && data.router.connected_devices !== null) {
+          devicesBadge.style.display = "flex";
+          devicesCount.textContent = `${data.router.connected_devices} active`;
+          const totalText = data.router.total_devices ? ` (${data.router.total_devices} known)` : "";
+          devicesBadge.title = `${data.router.connected_devices} active${totalText} • Click to view devices`;
+        }
+
+        if (Array.isArray(data.router.active_devices_list)) {
+          currentActiveDevices = data.router.active_devices_list;
+          if (isDevicesModalOpen) {
+            renderModalDeviceList();
+          }
+        }
+
+        // Wi-Fi bands
+        if (data.router.wifi_bands) {
+          wifiBadge.style.display = "flex";
+          wifiBands.textContent = data.router.wifi_bands;
+        }
+
+        // External IP
+        rawExternalIP = data.router.external_ip || "";
+        renderIP();
+
+        // Connection State & Access Type
+        const acc = data.router.access_type || "DSL";
+        if (data.router.is_connected !== false) {
+          statusTag.textContent = `🟢 Online (${acc})`;
+        } else {
+          statusTag.textContent = `🔴 Offline (${acc})`;
+        }
+
+        // DNS Servers
+        if (data.router.dns_servers) {
+          dnsTag.style.display = "inline";
+          dnsTag.textContent = `DNS: ${data.router.dns_servers.split(',')[0].trim()}`;
+        }
+      }
+
+      // Uptime
+      if (data.uptime && data.uptime.formatted) {
+        uptimeValue.textContent = data.uptime.formatted;
+      }
+
+      // Download metrics
+      if (data.traffic && data.traffic.download) {
+        const d = data.traffic.download;
+        
+        if (currentUnit === "mbps") {
+          downSpeed.textContent = d.mbps.toFixed(2);
+          downUnit.textContent = "Mbps";
+          downSecondary.textContent = `≈ ${d.mbyte_s.toFixed(2)} MB/s`;
+        } else {
+          downSpeed.textContent = d.mbyte_s.toFixed(2);
+          downUnit.textContent = "MB/s";
+          downSecondary.textContent = `≈ ${d.mbps.toFixed(2)} Mbps`;
+        }
+
+        downTotal.textContent = d.total_formatted || "0 B";
+
+        // Utilization progress bar
+        if (d.max_mbps && d.max_mbps > 0) {
+          const pct = Math.min(100, Math.max(0, d.utilization_pct || 0));
+          downUtilBar.style.width = `${pct}%`;
+          downUtilText.textContent = `${pct.toFixed(1)}% of ${d.max_mbps}M`;
+        } else {
+          downUtilBar.style.width = "0%";
+          downUtilText.textContent = "";
+        }
+
+        historyDown.shift();
+        historyDown.push(d.mbps);
+      }
+
+      // Upload metrics
+      if (data.traffic && data.traffic.upload) {
+        const u = data.traffic.upload;
+
+        if (currentUnit === "mbps") {
+          upSpeed.textContent = u.mbps.toFixed(2);
+          upUnit.textContent = "Mbps";
+          upSecondary.textContent = `≈ ${u.mbyte_s.toFixed(2)} MB/s`;
+        } else {
+          upSpeed.textContent = u.mbyte_s.toFixed(2);
+          upUnit.textContent = "MB/s";
+          upSecondary.textContent = `≈ ${u.mbps.toFixed(2)} Mbps`;
+        }
+
+        upTotal.textContent = u.total_formatted || "0 B";
+
+        // Utilization progress bar
+        if (u.max_mbps && u.max_mbps > 0) {
+          const pct = Math.min(100, Math.max(0, u.utilization_pct || 0));
+          upUtilBar.style.width = `${pct}%`;
+          upUtilText.textContent = `${pct.toFixed(1)}% of ${u.max_mbps}M`;
+        } else {
+          upUtilBar.style.width = "0%";
+          upUtilText.textContent = "";
+        }
+
+        historyUp.shift();
+        historyUp.push(u.mbps);
+      }
+
+      drawChart();
+    }
+
+    // Fetch metrics from backend API
+    async function fetchMetrics() {
+      try {
+        const response = await fetch("/api/metrics");
+        const data = await response.json();
+
+        if (data.status === "error") {
+          statusDot.className = "status-dot error";
+          errorBanner.classList.add("visible");
+          errorMessage.textContent = data.message || "Failed to communicate with router";
+          return;
+        }
+
+        // Connection healthy
+        statusDot.className = "status-dot pulsing";
+        errorBanner.classList.remove("visible");
+
+        renderMetrics(data);
+
+      } catch (err) {
+        statusDot.className = "status-dot error";
+        errorBanner.classList.add("visible");
+        errorMessage.textContent = "Widget backend offline or restarting...";
+      }
+    }
+
+    // Initial load & 2-second real-time polling
+    resizeCanvas();
+    fetchMetrics();
+    setInterval(fetchMetrics, 2000);
+  </script>
+</body>
+</html>
