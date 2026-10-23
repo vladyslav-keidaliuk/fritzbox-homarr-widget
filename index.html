@@ -81,6 +81,7 @@
       box-shadow: 0 0 8px var(--download-color);
       flex-shrink: 0;
       transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      cursor: pointer;
     }
 
     .status-dot.pulsing {
@@ -90,6 +91,12 @@
     .status-dot.error {
       background-color: var(--danger-color);
       box-shadow: 0 0 8px var(--danger-color);
+      animation: none;
+    }
+
+    .status-dot.paused {
+      background-color: var(--warning-color);
+      box-shadow: 0 0 8px var(--warning-color);
       animation: none;
     }
 
@@ -178,6 +185,41 @@
     .unit-pill.active {
       background: rgba(255, 255, 255, 0.15);
       color: var(--text-primary);
+    }
+
+    /* Pause / Resume Control Button */
+    .icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      width: 22px;
+      height: 20px;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--card-hover-border);
+      color: var(--text-primary);
+    }
+
+    .icon-btn.paused {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    .icon-btn svg {
+      width: 10px;
+      height: 10px;
+      fill: currentColor;
     }
 
     /* Metrics Grid */
@@ -800,6 +842,17 @@
           <span class="unit-pill active" id="pillMbps">Mbps</span>
           <span class="unit-pill" id="pillMBytes">MB/s</span>
         </div>
+
+        <!-- Pause / Resume Monitoring Toggle -->
+        <button class="icon-btn" id="pauseResumeBtn" title="Click to pause live monitoring">
+          <svg id="pauseIcon" viewBox="0 0 24 24">
+            <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+            <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+          </svg>
+          <svg id="playIcon" viewBox="0 0 24 24" style="display: none;">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -1071,6 +1124,12 @@
     const errorBanner = document.getElementById("errorBanner");
     const errorMessage = document.getElementById("errorMessage");
 
+    // Pause / Resume Elements & State
+    let isMonitoringPaused = localStorage.getItem("monitoring_paused") === "true";
+    const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+    const pauseIcon = document.getElementById("pauseIcon");
+    const playIcon = document.getElementById("playIcon");
+
     // Modal Elements
     const devicesModal = document.getElementById("devicesModal");
     const closeDevicesModalBtn = document.getElementById("closeDevicesModal");
@@ -1133,6 +1192,42 @@
         eyeIcon.textContent = "🔒";
       }
     }
+
+    // Toggle Live Monitoring (Pause / Resume)
+    function updatePauseResumeUI() {
+      if (isMonitoringPaused) {
+        pauseIcon.style.display = "none";
+        playIcon.style.display = "block";
+        pauseResumeBtn.classList.add("paused");
+        pauseResumeBtn.title = "Monitoring paused • Click to resume";
+        statusDot.className = "status-dot paused";
+        statusDot.title = "Monitoring paused • Click to resume";
+        statusTag.textContent = "⏸ Paused";
+      } else {
+        pauseIcon.style.display = "block";
+        playIcon.style.display = "none";
+        pauseResumeBtn.classList.remove("paused");
+        pauseResumeBtn.title = "Monitoring active • Click to pause";
+        statusDot.className = "status-dot pulsing";
+        statusDot.title = "Live TR-064 Connection • Click to pause";
+        if (lastMetrics && lastMetrics.router) {
+          const acc = lastMetrics.router.access_type || "DSL";
+          statusTag.textContent = lastMetrics.router.is_connected !== false ? `🟢 Online (${acc})` : `🔴 Offline (${acc})`;
+        }
+      }
+    }
+
+    function toggleMonitoring() {
+      isMonitoringPaused = !isMonitoringPaused;
+      localStorage.setItem("monitoring_paused", isMonitoringPaused.toString());
+      updatePauseResumeUI();
+      if (!isMonitoringPaused) {
+        fetchMetrics();
+      }
+    }
+
+    pauseResumeBtn.addEventListener("click", toggleMonitoring);
+    statusDot.addEventListener("click", toggleMonitoring);
 
     // Modal open / close / filter logic
     function openDevicesModal() {
@@ -1340,7 +1435,9 @@
 
         // Connection State & Access Type
         const acc = data.router.access_type || "DSL";
-        if (data.router.is_connected !== false) {
+        if (isMonitoringPaused) {
+          statusTag.textContent = "⏸ Paused";
+        } else if (data.router.is_connected !== false) {
           statusTag.textContent = `🟢 Online (${acc})`;
         } else {
           statusTag.textContent = `🔴 Offline (${acc})`;
@@ -1422,9 +1519,11 @@
     }
 
     // Fetch metrics from backend API (or run live simulated mock on GitHub Pages)
-    async function fetchMetrics() {
+    async function fetchMetrics(force = false) {
+      if (isMonitoringPaused && !force) return;
+
       if (isStaticDemo) {
-        statusDot.className = "status-dot pulsing";
+        if (!isMonitoringPaused) statusDot.className = "status-dot pulsing";
         errorBanner.classList.remove("visible");
         renderMetrics(generateClientMockData());
         return;
@@ -1434,6 +1533,8 @@
         const basePath = window.location.pathname.replace(/\/+$/, "");
         const response = await fetch(`${basePath}/api/metrics`);
         
+        if (isMonitoringPaused && !force) return;
+
         if (!response.ok) {
           if (window.location.hostname.endsWith("github.io")) {
             renderMetrics(generateClientMockData());
@@ -1444,6 +1545,8 @@
 
         const data = await response.json();
 
+        if (isMonitoringPaused && !force) return;
+
         if (data.status === "error") {
           statusDot.className = "status-dot error";
           errorBanner.classList.add("visible");
@@ -1452,12 +1555,13 @@
         }
 
         // Connection healthy
-        statusDot.className = "status-dot pulsing";
+        if (!isMonitoringPaused) statusDot.className = "status-dot pulsing";
         errorBanner.classList.remove("visible");
 
         renderMetrics(data);
 
       } catch (err) {
+        if (isMonitoringPaused && !force) return;
         if (window.location.hostname.endsWith("github.io")) {
           renderMetrics(generateClientMockData());
           return;
@@ -1468,10 +1572,15 @@
       }
     }
 
-    // Initial load & 2-second real-time polling
+    // Initial load & real-time polling
     resizeCanvas();
-    fetchMetrics();
-    setInterval(fetchMetrics, 2000);
+    updatePauseResumeUI();
+    fetchMetrics(true);
+    setInterval(() => {
+      if (!isMonitoringPaused) {
+        fetchMetrics();
+      }
+    }, 2000);
   </script>
 </body>
 </html>

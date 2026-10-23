@@ -215,6 +215,7 @@ If accessing your HTTPS Homarr without setting up a reverse proxy path:
 
 Once added to your dashboard, the widget provides several interactive controls:
 - **Mbps / MB/s Toggle**: Click either the Download or Upload card to switch between Megabits/s and Megabytes/s. Your preferred unit is automatically remembered across reloads.
+- **Pause / Resume Monitoring**: Click the **`⏸`** button in the header (or the green pulse dot) to freeze monitoring and halt all background router requests when not needed. Click the golden **`▶`** button to instantly resume live polling.
 - **Active Clients Inspection**: Click the **`X active`** badge in the header to open an embedded slide-over modal displaying all currently connected devices with hostnames, IP addresses, Wi-Fi (📶) vs LAN (🔌) indicators, and real-time search filtering. Press <kbd>Esc</kbd> or click <kbd>✕</kbd> to close.
 - **Public IP Privacy Mask**: Click the public IP pill (👁) in the bottom bar to toggle masking on/off (`•••.•••.•••.•••`), keeping your real IP safe from accidental exposure in screenshots.
 
